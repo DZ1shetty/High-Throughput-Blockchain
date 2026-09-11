@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -143,6 +145,31 @@ func (s *server) handleBenchmark(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// ── / (dashboard) ────────────────────────────────────────────────────────────
+
+func (s *server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Resolve web/index.html relative to the running executable so the server
+	// works regardless of the working directory it is started from.
+	exe, err := os.Executable()
+	if err != nil {
+		http.Error(w, "could not locate executable", http.StatusInternalServerError)
+		return
+	}
+	htmlPath := filepath.Join(filepath.Dir(exe), "web", "index.html")
+
+	// Fall back to cwd-relative path (useful during `go run .`).
+	if _, err := os.Stat(htmlPath); err != nil {
+		htmlPath = filepath.Join("web", "index.html")
+	}
+
+	http.ServeFile(w, r, htmlPath)
+}
+
 // ── /blocks ──────────────────────────────────────────────────────────────────
 
 func (s *server) handleBlocks(w http.ResponseWriter, r *http.Request) {
@@ -197,9 +224,11 @@ func StartServer(bc *ShardedBlockchain, wallet *Wallet) {
 	mux.HandleFunc("/benchmark", s.handleBenchmark)
 	mux.HandleFunc("/scaling", s.handleScaling)
 	mux.HandleFunc("/blocks", s.handleBlocks)
+	mux.HandleFunc("/", s.handleDashboard)
 
 	addr := ":8080"
 	fmt.Printf("Server listening on http://localhost%s\n", addr)
+	fmt.Println("  GET  /            — web dashboard")
 	fmt.Println("  POST /transaction  — submit a transaction")
 	fmt.Println("  GET  /stats        — chain statistics")
 	fmt.Println("  GET  /benchmark    — run sequential vs parallel benchmark")

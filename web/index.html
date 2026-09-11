@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>High-Throughput Blockchain</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #21262d;
+      --border:    #30363d;
+      --primary:   #58a6ff;
+      --success:   #3fb950;
+      --warning:   #d29922;
+      --danger:    #f85149;
+      --muted:     #8b949e;
+      --text:      #c9d1d9;
+      --text-head: #e6edf3;
+      --radius:    8px;
+      --mono:      'SFMono-Regular', Consolas, monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── layout ────────────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 56px;
+    }
+    header h1 { font-size: 16px; color: var(--text-head); font-weight: 600; }
+    header .badge {
+      background: var(--primary);
+      color: #0d1117;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: .4px;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      margin-left: auto;
+      box-shadow: 0 0 6px var(--success);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    section { margin-bottom: 32px; }
+    section > h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    section > h2::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── stat cards ─────────────────────────────────────────────────────── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      transition: border-color .2s;
+    }
+    .card:hover { border-color: var(--primary); }
+    .card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-head);
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .card .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── form ────────────────────────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 140px auto;
+      gap: 10px;
+      align-items: end;
+    }
+    @media (max-width: 680px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-head);
+      font-size: 14px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus { border-color: var(--primary); }
+
+    button {
+      background: var(--primary);
+      color: #0d1117;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 18px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .15s, transform .1s;
+    }
+    button:hover { opacity: .88; }
+    button:active { transform: scale(.97); }
+    button.secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover { border-color: var(--primary); color: var(--primary); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .tx-result {
+      margin-top: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .tx-result.success { border-color: var(--success); color: var(--success); }
+    .tx-result.error   { border-color: var(--danger);  color: var(--danger);  }
+
+    /* ── tables ──────────────────────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--surface2); }
+    th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+      padding: 10px 16px;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      vertical-align: middle;
+      font-variant-numeric: tabular-nums;
+    }
+    tbody tr:hover { background: var(--surface2); }
+
+    .pill {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .pill-blue   { background: #1d3a5f; color: var(--primary); }
+    .pill-green  { background: #1a3826; color: var(--success); }
+    .pill-yellow { background: #3a2e0a; color: var(--warning); }
+
+    .mono { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+    .bench-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .bench-box {
+      flex: 1;
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #refresh-ts { font-size: 11px; color: var(--muted); margin-left: auto; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⛓ High-Throughput Blockchain</h1>
+  <span class="badge">Go</span>
+  <span id="refresh-ts">—</span>
+  <div class="live-dot" title="Live — refreshing every 2s"></div>
+</header>
+
+<main>
+
+  <!-- ── STATS ─────────────────────────────────────────────────────────── -->
+  <section>
+    <h2>Chain Stats</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="label">Blocks</div>
+        <div class="value" id="stat-blocks">—</div>
+        <div class="sub">including genesis</div>
+      </div>
+      <div class="card">
+        <div class="label">Transactions</div>
+        <div class="value" id="stat-txs">—</div>
+        <div class="sub">total committed</div>
+      </div>
+      <div class="card">
+        <div class="label">Uptime</div>
+        <div class="value" id="stat-uptime">—</div>
+        <div class="sub">seconds</div>
+      </div>
+      <div class="card">
+        <div class="label">Shards</div>
+        <div class="value" id="stat-shards">—</div>
+        <div class="sub">parallel workers</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SUBMIT TX ─────────────────────────────────────────────────────── -->
+  <section>
+    <h2>Submit Transaction</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>Sender</label>
+        <input id="tx-sender" type="text" placeholder="alice" />
+      </div>
+      <div class="field">
+        <label>Receiver</label>
+        <input id="tx-receiver" type="text" placeholder="bob" />
+      </div>
+      <div class="field">
+        <label>Amount</label>
+        <input id="tx-amount" type="number" step="0.01" min="0.01" placeholder="10.00" />
+      </div>
+      <button id="tx-submit">Send →</button>
+    </div>
+    <pre id="tx-result" class="tx-result"></pre>
+  </section>
+
+  <!-- ── BLOCK EXPLORER ────────────────────────────────────────────────── -->
+  <section>
+    <h2>Block Explorer</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Timestamp</th>
+            <th>Transactions</th>
+            <th>Merkle Root</th>
+            <th>Consensus Sigs</th>
+            <th>Hash</th>
+          </tr>
+        </thead>
+        <tbody id="blocks-tbody">
+          <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── BENCHMARKS ────────────────────────────────────────────────────── -->
+  <section>
+    <h2>Benchmarks</h2>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="secondary" id="btn-benchmark">▶ Run Benchmark</button>
+      <button class="secondary" id="btn-scaling">▶ Run Scaling Test</button>
+    </div>
+    <div class="bench-row">
+      <div class="bench-box" id="bench-result-wrap" style="display:none">
+        <table>
+          <thead><tr><th>Approach</th><th>Time (ms)</th><th>TPS</th><th>Blocks</th></tr></thead>
+          <tbody id="bench-tbody"></tbody>
+        </table>
+      </div>
+      <div class="bench-box" id="scaling-result-wrap" style="display:none">
+        <table>
+          <thead><tr><th>Shards</th><th>Time (ms)</th><th>TPS</th></tr></thead>
+          <tbody id="scaling-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  /* ── helpers ──────────────────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+
+  function fmt(n, digits = 0) {
+    return Number(n).toLocaleString('en-US', { maximumFractionDigits: digits });
+  }
+
+  function trunc(s, n = 10) {
+    if (!s) return '<span class="mono" style="color:var(--muted)">—</span>';
+    return `<span class="mono" title="${s}">${s.slice(0, n)}…</span>`;
+  }
+
+  function tsLocal(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('en-US', { hour12: false }) +
+           '<br><span style="font-size:11px;color:var(--muted)">' +
+           d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</span>';
+  }
+
+  /* ── stats ────────────────────────────────────────────────────────────── */
+  async function refreshStats() {
+    try {
+      const r = await fetch('/stats');
+      if (!r.ok) return;
+      const d = await r.json();
+      $('stat-blocks').textContent  = fmt(d.block_count);
+      $('stat-txs').textContent     = fmt(d.total_transactions);
+      $('stat-uptime').textContent  = fmt(d.uptime_seconds, 1);
+      $('stat-shards').textContent  = d.num_shards;
+      $('refresh-ts').textContent   = 'Updated ' + new Date().toLocaleTimeString();
+    } catch (_) { /* server down — stats will stay stale */ }
+  }
+
+  /* ── blocks ───────────────────────────────────────────────────────────── */
+  async function refreshBlocks() {
+    try {
+      const r = await fetch('/blocks');
+      if (!r.ok) return;
+      const blocks = await r.json();
+      const tbody = $('blocks-tbody');
+
+      if (!blocks || blocks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">No blocks yet</td></tr>';
+        return;
+      }
+
+      // Show newest first
+      const rows = [...blocks].reverse().map(b => {
+        const txCount  = (b.transactions || []).length;
+        const sigCount = (b.consensus_signatures || []).length;
+
+        const sigPill = sigCount >= 3
+          ? `<span class="pill pill-green">${sigCount} / 4</span>`
+          : sigCount > 0
+          ? `<span class="pill pill-yellow">${sigCount} / 4</span>`
+          : `<span class="pill" style="background:#2d1a1a;color:var(--muted)">—</span>`;
+
+        const txPill = txCount > 0
+          ? `<span class="pill pill-blue">${txCount}</span>`
+          : `<span style="color:var(--muted)">0</span>`;
+
+        return `<tr>
+          <td><strong style="color:var(--text-head)">${b.index}</strong></td>
+          <td>${tsLocal(b.timestamp)}</td>
+          <td>${txPill}</td>
+          <td>${trunc(b.merkle_root)}</td>
+          <td>${sigPill}</td>
+          <td>${trunc(b.hash)}</td>
+        </tr>`;
+      }).join('');
+
+      tbody.innerHTML = rows;
+    } catch (_) {}
+  }
+
+  /* ── submit transaction ───────────────────────────────────────────────── */
+  $('tx-submit').addEventListener('click', async () => {
+    const sender   = $('tx-sender').value.trim();
+    const receiver = $('tx-receiver').value.trim();
+    const amount   = parseFloat($('tx-amount').value);
+    const out      = $('tx-result');
+
+    if (!sender || !receiver || !amount || amount <= 0) {
+      out.textContent = 'Please fill in all fields with valid values.';
+      out.className   = 'tx-result error';
+      out.style.display = 'block';
+      return;
+    }
+
+    $('tx-submit').disabled = true;
+    $('tx-submit').innerHTML = '<span class="spinner"></span>Sending…';
+    out.style.display = 'none';
+
+    try {
+      const r = await fetch('/transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender, receiver, amount })
+      });
+      const data = await r.json();
+
+      if (r.ok && data.success) {
+        const tx = data.transaction;
+        out.textContent = [
+          `✓ Transaction accepted  (block count: ${data.block_count})`,
+          `  TX ID    : ${tx.tx_id}`,
+          `  From     : ${tx.sender}  →  ${tx.receiver}`,
+          `  Amount   : ${tx.amount}`,
+          `  Sig      : ${tx.signature.slice(0, 32)}…`,
+        ].join('\n');
+        out.className = 'tx-result success';
+      } else {
+        out.textContent = 'Error: ' + JSON.stringify(data, null, 2);
+        out.className   = 'tx-result error';
+      }
+    } catch (e) {
+      out.textContent = 'Network error: ' + e.message;
+      out.className   = 'tx-result error';
+    } finally {
+      out.style.display = 'block';
+      $('tx-submit').disabled = false;
+      $('tx-submit').textContent = 'Send →';
+      refreshStats();
+      refreshBlocks();
+    }
+  });
+
+  /* ── benchmark ────────────────────────────────────────────────────────── */
+  $('btn-benchmark').addEventListener('click', async () => {
+    const btn = $('btn-benchmark');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Running…';
+
+    try {
+      const r    = await fetch('/benchmark');
+      const d    = await r.json();
+      const wrap = $('bench-result-wrap');
+      $('bench-tbody').innerHTML = `
+        <tr>
+          <td>Sequential</td>
+          <td class="mono">${fmt(d.sequential_time_ms, 2)}</td>
+          <td class="mono">${fmt(d.sequential_tps, 0)}</td>
+          <td>${d.sequential_blocks}</td>
+        </tr>
+        <tr>
+          <td>Parallel (${d.num_shards} shards)</td>
+          <td class="mono">${fmt(d.parallel_time_ms, 2)}</td>
+          <td class="mono" style="color:var(--success)">${fmt(d.parallel_tps, 0)}</td>
+          <td>${d.parallel_blocks}</td>
+        </tr>
+        <tr style="background:var(--surface2)">
+          <td colspan="2" style="color:var(--muted);font-size:12px">Speedup</td>
+          <td colspan="2" style="color:var(--primary);font-weight:700">
+            +${fmt(d.speedup_percent, 1)}%
+          </td>
+        </tr>`;
+      wrap.style.display = 'block';
+    } catch (e) {
+      alert('Benchmark failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Run Benchmark';
+    }
+  });
+
+  /* ── scaling ──────────────────────────────────────────────────────────── */
+  $('btn-scaling').addEventListener('click', async () => {
+    const btn = $('btn-scaling');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Running…';
+
+    try {
+      const r    = await fetch('/scaling');
+      const rows = await r.json();
+      const max  = Math.max(...rows.map(r => r.tps));
+      $('scaling-tbody').innerHTML = rows.map(row => {
+        const pct  = ((row.tps / max) * 100).toFixed(0);
+        const bar  = `<div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px">
+                        <div style="width:${pct}%;height:100%;background:var(--primary);border-radius:2px"></div>
+                      </div>`;
+        return `<tr>
+          <td><span class="pill pill-blue">${row.num_shards}</span></td>
+          <td class="mono">${fmt(row.time_ms, 2)}</td>
+          <td class="mono">${fmt(row.tps, 0)}${bar}</td>
+        </tr>`;
+      }).join('');
+      $('scaling-result-wrap').style.display = 'block';
+    } catch (e) {
+      alert('Scaling test failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Run Scaling Test';
+    }
+  });
+
+  /* ── poll ─────────────────────────────────────────────────────────────── */
+  refreshStats();
+  refreshBlocks();
+  setInterval(() => { refreshStats(); refreshBlocks(); }, 2000);
+</script>
+
+</body>
+</html>
